@@ -163,6 +163,7 @@ class Planarity_solver:
                     if P != Conflict_pair():
                         self.S.append(P)
 
+        # Remove back edges returning to parent.
         if e is not None:
             u = e[0]
 

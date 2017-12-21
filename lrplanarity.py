@@ -98,6 +98,7 @@ class Planarity_solver:
 
             self.nesting_depth[v, w] = 2 * self.lowpt[v, w] + (self.lowpt2[v, w] < self.height[v])
 
+            # Update lowpoints of parent edge e.
             if e is not None:
                 if self.lowpt[v, w] < self.lowpt[e]:
                     self.lowpt2[e] = min(self.lowpt[e], self.lowpt2[v, w])
@@ -118,12 +119,14 @@ class Planarity_solver:
                 self.lowpt_edge[e_i] = e_i
                 self.S.append(Conflict_pair(R=Interval(e_i, e_i)))
 
+            # Integrate new return edges.
             if self.lowpt[e_i] < self.height[v]:
                 if i == 0:
                     self.lowpt_edge[e] = self.lowpt_edge[e_i]
-                else:
+                else: # Add constraints of e_i.
                     P = Conflict_pair()
 
+                    # Merge return edges of e_i into P.R.
                     while self.S[-1] != self.stack_bottom[e_i]:
                         Q = self.S.pop()
                         if not Q.L.is_empty():
@@ -138,7 +141,8 @@ class Planarity_solver:
                             P.R.low = Q.R.low
                         else:
                             self.ref[Q.R.low] = self.lowpt_edge[e]
-                    
+
+                    # Merge conflicting return edges of e_1, ..., e_(i-1) into P.L.
                     while self._conflicting(self.S[-1].L, e_i) or self._conflicting(self.S[-1].R, e_i):
                         Q = self.S.pop()
                         if self._conflicting(Q.R, e_i):
@@ -162,14 +166,19 @@ class Planarity_solver:
         if e is not None:
             u = e[0]
 
+            # Trim back edges ending at parent u: 2 steps.
+
+            # Step 1: drop entire conflict pairs.
             while self.S[-1] is not None and self._lowest(self.S[-1]) == self.height[u]:
                 P = self.S.pop()
                 if P.L.low is not None:
                     self.side[P.L.low] = -1
 
+            # Step 2: consider one more conflict pair.
             if self.S[-1] is not None:
                 P = self.S.pop()
 
+                # Trim left interval.
                 while P.L.high is not None and P.L.high[1] == u:
                     P.L.high = self.ref[P.L.high]
                 if P.L.high is None and P.L.low is not None:
@@ -177,6 +186,7 @@ class Planarity_solver:
                     self.side[P.L.low] = -1
                     P.L.low = None
 
+                # Trim right interval.
                 while P.R.high is not None and P.R.high[1] == u:
                     P.R.high = self.ref[P.R.high]
                 if P.R.high is None and P.R.low is not None:
@@ -186,13 +196,14 @@ class Planarity_solver:
 
                 self.S.append(P)
 
+            # Side of e is side of the highest return edge (left or right).
             if self.lowpt[e] < self.height[u]:
                 h_L, h_R = self.S[-1].L.high, self.S[-1].R.high
                 if h_L is not None and (h_R is None or self.lowpt[h_L] > self.lowpt[h_R]):
                     self.ref[e] = h_L
                 else:
                     self.ref[e] = h_R
-    
+
     def _dfs3(self, v):
         for w in self.dfs_graph[v]:
             e_i = v, w
